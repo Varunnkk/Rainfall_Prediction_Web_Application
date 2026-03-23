@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>RainML — Siem Reap Rainfall Prediction</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#04080f;--bg2:#080e1a;--bg3:#0c1422;--card:#0a1320;
+  --border:#162035;--border2:#1e2f4d;
+  --blue:#0ea5e9;--cyan:#06b6d4;--green:#10b981;--yellow:#f59e0b;
+  --orange:#f97316;--red:#ef4444;--purple:#8b5cf6;
+  --text:#e2edf8;--text2:#7ea4c4;--text3:#3d6080;
+  --glow-blue:0 0 24px rgba(14,165,233,0.2);
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+
+/* ── GRID NOISE BG ── */
+body::before{content:'';position:fixed;inset:0;
+  background-image:radial-gradient(circle at 20% 20%,rgba(14,165,233,0.04) 0%,transparent 50%),
+    radial-gradient(circle at 80% 80%,rgba(6,182,212,0.03) 0%,transparent 50%),
+    linear-gradient(rgba(14,165,233,0.02) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(14,165,233,0.02) 1px,transparent 1px);
+  background-size:100% 100%,100% 100%,40px 40px,40px 40px;
+  pointer-events:none;z-index:0;}
+
+/* ── HEADER ── */
+header{position:sticky;top:0;z-index:100;
+  background:rgba(4,8,15,0.92);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 32px;height:64px;}
+.logo{display:flex;align-items:center;gap:12px;}
+.logo-icon{width:36px;height:36px;border-radius:10px;
+  background:linear-gradient(135deg,var(--blue),var(--cyan));
+  display:flex;align-items:center;justify-content:center;font-size:18px;}
+.logo-text{font-size:1.1rem;font-weight:700;color:var(--text);letter-spacing:-0.3px;}
+.logo-sub{font-size:0.65rem;color:var(--text3);font-weight:400;}
+.header-stats{display:flex;gap:20px;}
+.hstat{text-align:center;}
+.hstat-val{font-family:'JetBrains Mono',monospace;font-size:0.9rem;font-weight:600;color:var(--blue);}
+.hstat-label{font-size:0.6rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;}
+.live-badge{background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);
+  color:var(--green);padding:4px 10px;border-radius:20px;font-size:0.7rem;font-weight:600;
+  display:flex;align-items:center;gap:5px;}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+
+/* ── LAYOUT ── */
+main{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:28px 32px;}
+
+/* ── NAV TABS ── */
+.tabs{display:flex;gap:4px;background:var(--bg2);border:1px solid var(--border);
+  border-radius:12px;padding:5px;margin-bottom:28px;width:fit-content;}
+.tab{background:none;border:none;cursor:pointer;color:var(--text3);
+  font-family:'Outfit',sans-serif;font-size:0.82rem;font-weight:500;
+  padding:8px 18px;border-radius:8px;transition:all 0.2s;white-space:nowrap;}
+.tab:hover{color:var(--text);}
+.tab.active{background:var(--blue);color:white;font-weight:600;}
+
+/* ── PAGES ── */
+.page{display:none;}
+.page.active{display:block;animation:fadeUp 0.3s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+
+/* ── SECTION HEADER ── */
+.section-header{margin-bottom:24px;}
+.section-title{font-size:1.6rem;font-weight:800;color:var(--text);letter-spacing:-0.5px;}
+.section-sub{font-size:0.85rem;color:var(--text2);margin-top:4px;}
+
+/* ── KPI GRID ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px;}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:18px;position:relative;overflow:hidden;transition:border-color 0.2s;}
+.kpi:hover{border-color:var(--border2);}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kpi-color,var(--blue));}
+.kpi-label{font-size:0.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;}
+.kpi-val{font-family:'JetBrains Mono',monospace;font-size:1.7rem;font-weight:600;
+  color:var(--kpi-color,var(--blue));line-height:1;}
+.kpi-desc{font-size:0.72rem;color:var(--text3);margin-top:6px;}
+
+/* ── CHART CARDS ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:18px;}
+.card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;}
+.card-title{font-size:0.95rem;font-weight:600;color:var(--text);}
+.card-sub{font-size:0.73rem;color:var(--text3);margin-top:2px;}
+.card-badge{font-size:0.62rem;padding:3px 10px;border-radius:20px;
+  background:rgba(14,165,233,0.1);color:var(--blue);border:1px solid rgba(14,165,233,0.2);
+  font-family:'JetBrains Mono',monospace;font-weight:600;white-space:nowrap;}
+.chart-wrap{position:relative;}
+
+/* ── GRID LAYOUTS ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;}
+@media(max-width:900px){.g2,.g3{grid-template-columns:1fr;}}
+
+/* ── PREDICTOR ── */
+.predictor-hero{background:linear-gradient(135deg,rgba(14,165,233,0.06),rgba(6,182,212,0.03));
+  border:1px solid rgba(14,165,233,0.15);border-radius:20px;padding:28px;margin-bottom:24px;}
+.pred-title{font-size:1.2rem;font-weight:700;margin-bottom:4px;}
+.pred-sub{font-size:0.83rem;color:var(--text2);margin-bottom:20px;}
+
+.date-picker-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;}
+.inp-group{display:flex;flex-direction:column;gap:5px;}
+.inp-label{font-size:0.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;}
+.date-inp{background:var(--bg3);border:1px solid var(--border);border-radius:10px;
+  padding:10px 14px;color:var(--text);font-family:'Outfit',sans-serif;font-size:0.9rem;
+  outline:none;transition:border-color 0.2s,box-shadow 0.2s;min-width:160px;}
+.date-inp:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(14,165,233,0.1);}
+.date-inp[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.5);}
+
+.btn{border:none;border-radius:10px;padding:10px 22px;cursor:pointer;
+  font-family:'Outfit',sans-serif;font-size:0.88rem;font-weight:600;
+  transition:all 0.2s;white-space:nowrap;}
+.btn-primary{background:linear-gradient(135deg,var(--blue),var(--cyan));color:white;
+  box-shadow:0 4px 16px rgba(14,165,233,0.3);}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(14,165,233,0.4);}
+.btn-ghost{background:rgba(14,165,233,0.08);color:var(--blue);border:1px solid rgba(14,165,233,0.2);}
+.btn-ghost:hover{background:rgba(14,165,233,0.15);}
+.btn:disabled{opacity:0.5;cursor:not-allowed;transform:none!important;}
+
+/* ── RESULT DISPLAY ── */
+.result-panel{display:none;margin-top:20px;}
+.result-panel.show{display:block;animation:fadeUp 0.3s ease;}
+.result-main{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:start;}
+.result-rainfall{text-align:center;
+  background:linear-gradient(135deg,rgba(14,165,233,0.08),rgba(6,182,212,0.04));
+  border:1px solid rgba(14,165,233,0.2);border-radius:16px;padding:24px 32px;}
+.result-mm{font-family:'JetBrains Mono',monospace;font-size:3.5rem;font-weight:600;
+  background:linear-gradient(135deg,var(--blue),var(--cyan));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1;}
+.result-unit{font-size:0.8rem;color:var(--text2);margin-top:4px;}
+.result-date-label{font-size:0.7rem;color:var(--text3);margin-top:8px;}
+.intensity-badge{display:inline-block;margin-top:10px;padding:5px 14px;
+  border-radius:20px;font-size:0.78rem;font-weight:600;}
+.result-meta{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.meta-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;
+  padding:12px;text-align:center;}
+.meta-val{font-family:'JetBrains Mono',monospace;font-size:1rem;font-weight:600;color:var(--text);}
+.meta-label{font-size:0.65rem;color:var(--text3);margin-top:2px;}
+
+/* ── RANGE RESULT ── */
+.range-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+
+/* ── TABLE ── */
+.data-table{width:100%;border-collapse:collapse;font-size:0.8rem;}
+.data-table th{background:rgba(14,165,233,0.08);color:var(--blue);
+  padding:10px 12px;text-align:left;font-weight:600;font-size:0.68rem;
+  text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
+.data-table td{padding:9px 12px;border-bottom:1px solid rgba(22,32,53,0.5);
+  color:var(--text2);font-family:'JetBrains Mono',monospace;font-size:0.77rem;}
+.data-table tr:hover td{background:rgba(255,255,255,0.02);}
+.data-table tbody tr:last-child td{border-bottom:none;}
+
+/* ── RAIN BAR ── */
+.rain-bar{height:6px;border-radius:3px;background:var(--border);overflow:hidden;margin-top:4px;}
+.rain-fill{height:100%;border-radius:3px;transition:width 0.8s cubic-bezier(0.4,0,0.2,1);}
+
+/* ── LOADING ── */
+.loading{display:flex;align-items:center;justify-content:center;gap:8px;
+  color:var(--text3);font-size:0.85rem;padding:20px;}
+.spinner{width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--blue);
+  border-radius:50%;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* ── LEGEND ── */
+.legend{display:flex;gap:16px;flex-wrap:wrap;}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:0.74rem;color:var(--text2);}
+.legend-dot{width:10px;height:3px;border-radius:2px;}
+
+/* ── INFO BOX ── */
+.info-box{background:rgba(14,165,233,0.05);border:1px solid rgba(14,165,233,0.12);
+  border-radius:10px;padding:12px 16px;font-size:0.8rem;color:var(--text2);line-height:1.6;
+  margin-bottom:14px;}
+.info-box b{color:var(--blue);}
+
+/* ── CALENDAR HEATMAP ── */
+.calendar-grid{display:grid;grid-template-columns:repeat(52,1fr);gap:2px;overflow-x:auto;}
+.cal-day{width:12px;height:12px;border-radius:2px;cursor:pointer;transition:opacity 0.1s;}
+.cal-day:hover{opacity:0.8;transform:scale(1.3);}
+
+/* ── MODEL TABLE ── */
+.model-table{width:100%;border-collapse:collapse;}
+.model-table th{background:rgba(139,92,246,0.08);color:var(--purple);padding:10px 14px;
+  text-align:left;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;
+  border-bottom:1px solid var(--border);}
+.model-table td{padding:10px 14px;border-bottom:1px solid rgba(22,32,53,0.5);
+  color:var(--text2);font-family:'JetBrains Mono',monospace;font-size:0.78rem;}
+.model-table .best-row td{background:rgba(16,185,129,0.04);color:var(--text);}
+.model-table .best-row .model-name{color:var(--green);}
+.best-tag{background:rgba(16,185,129,0.15);color:var(--green);
+  padding:2px 8px;border-radius:20px;font-size:0.62rem;margin-left:6px;}
+
+/* scrollbar */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg2);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
+
+/* ── RAIN & THUNDER EFFECT ── */
+#rain-canvas{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  pointer-events:none;z-index:2;opacity:1;
+}
+.thunder-flash{
+  position:fixed;inset:0;z-index:3;
+  background:rgba(180,220,255,0);
+  pointer-events:none;
+  transition:background 0.05s;
+}
+
+
+/* ── MUTE BUTTON ── */
+#muteBtn{
+  position:fixed;top:16px;right:16px;z-index:999;
+  background:rgba(14,165,233,0.15);border:1px solid rgba(14,165,233,0.35);
+  color:#e2edf8;font-family:'Outfit',sans-serif;font-size:0.8rem;font-weight:600;
+  padding:7px 14px;border-radius:20px;cursor:pointer;
+  backdrop-filter:blur(10px);transition:all 0.2s;
+  display:flex;align-items:center;gap:6px;
+}
+#muteBtn:hover{background:rgba(14,165,233,0.28);border-color:rgba(14,165,233,0.6);}
+
+/* ── LIGHTNING CANVAS ── */
+#lightning-canvas{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  pointer-events:none;z-index:1;opacity:1;
+}
+
+</style>
+</head>
+<body>
+<canvas id="rain-canvas"></canvas>
+
+<button id="muteBtn" onclick="toggleMute()">🔊 Sound ON</button>
+<canvas id="lightning-canvas"></canvas>
+
+<div class="thunder-flash" id="thunderFlash"></div>
+
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🌧️</div>
+    <div>
+      <div class="logo-text">RainML — Siem Reap</div>
+      <div class="logo-sub">BCV605A · BMS Institute of Technology & Management</div>
+    </div>
+  </div>
+  <div class="header-stats" id="headerStats">
+    <div class="hstat"><div class="hstat-val" id="hModel">—</div><div class="hstat-label">Best Model</div></div>
+    <div class="hstat"><div class="hstat-val" id="hR2">—</div><div class="hstat-label">R² Score</div></div>
+    <div class="hstat"><div class="hstat-val" id="hRMSE">—</div><div class="hstat-label">RMSE (mm)</div></div>
+  </div>
+  <div class="live-badge"><div class="live-dot"></div>Live Predictions</div>
+</header>
+
+<main>
+  <!-- NAV -->
+  <div class="tabs">
+    <button class="tab active" onclick="showPage('dashboard',this)">📊 Dashboard</button>
+    <button class="tab" onclick="showPage('predict',this)">🎯 Predict Date</button>
+    <button class="tab" onclick="showPage('range',this)">📅 Date Range</button>
+    <button class="tab" onclick="showPage('forecast',this)">🔮 2026 Forecast</button>
+    <button class="tab" onclick="showPage('models',this)">🤖 Models</button>
+  </div>
+
+  <!-- ═══ DASHBOARD ═══ -->
+  <div id="page-dashboard" class="page active">
+    <div class="section-header">
+      <div class="section-title">Project Dashboard</div>
+      <div class="section-sub">Rainfall prediction using ML — trained on 30 years of NASA POWER data (1995–2023)</div>
+    </div>
+
+    <div class="kpi-grid" id="kpiGrid">
+      <div class="loading"><div class="spinner"></div> Loading...</div>
+    </div>
+
+    <div class="g2">
+      <div class="card" style="grid-column:1/-1">
+        <div class="card-header">
+          <div><div class="card-title">Monthly Rainfall Climatology</div><div class="card-sub">Historical average daily rainfall by month (1995–2023)</div></div>
+          <div class="card-badge">SEASONAL PATTERN</div>
+        </div>
+        <div class="legend" style="margin-bottom:12px">
+          <div class="legend-item"><div class="legend-dot" style="background:#0ea5e9"></div>Historical Avg</div>
+        </div>
+        <div class="chart-wrap" style="height:240px"><canvas id="monthlyChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div><div class="card-title">Annual Rainfall Trend</div><div class="card-sub">Total annual rainfall 1995–2023</div></div>
+          <div class="card-badge">TREND</div>
+        </div>
+        <div class="chart-wrap" style="height:220px"><canvas id="yearlyChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div><div class="card-title">Model vs Actual (Test Set)</div><div class="card-sub">Actual vs predicted on 2024–2025 data</div></div>
+          <div class="card-badge">VALIDATION</div>
+        </div>
+        <div class="chart-wrap" style="height:220px"><canvas id="testChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div><div class="card-title">Study Area Details</div></div>
+      </div>
+      <div class="g3" style="gap:12px">
+        <div class="info-box"><b>📍 Location</b><br>Siem Reap, Cambodia<br>13.3616°N · 103.8594°E · 36.86 m elevation</div>
+        <div class="info-box"><b>🌦️ Climate</b><br>Tropical Monsoon (Köppen Am)<br>Wet: May–Oct · Dry: Nov–Apr</div>
+        <div class="info-box"><b>📡 Data Source</b><br>NASA POWER Daily Reanalysis<br>MERRA-2 · 1995–2023 (10,592 rows)</div>
+        <div class="info-box"><b>🎯 Target Variable</b><br>PRECTOTCORR — Precipitation Corrected<br>Unit: mm/day</div>
+        <div class="info-box"><b>🔬 Features Used</b><br>16 features: DOY, SIN/COS seasonal, temperature, humidity, wind, soil moisture</div>
+        <div class="info-box"><b>🧠 Best Model</b><br>Random Forest (200 trees)<br>R²=0.46 on 2024–2025 unseen data</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PREDICT SINGLE DATE ═══ -->
+  <div id="page-predict" class="page">
+    <div class="section-header">
+      <div class="section-title">🎯 Predict Rainfall for a Date</div>
+      <div class="section-sub">Enter any future date to get a rainfall prediction from the trained Random Forest model</div>
+    </div>
+
+    <div class="predictor-hero">
+      <div class="pred-title">Single Date Predictor</div>
+      <div class="pred-sub">The model uses seasonal climatology patterns from 1995–2023 training data to predict future rainfall.</div>
+      <div class="date-picker-row">
+        <div class="inp-group">
+          <label class="inp-label">Select Date</label>
+          <input type="date" class="date-inp" id="singleDate" min="2026-01-01" max="2030-12-31" value="2026-06-15">
+        </div>
+        <button class="btn btn-primary" onclick="predictSingle()">⚡ Predict</button>
+        <button class="btn btn-ghost" onclick="predictToday()">📅 Today +1yr</button>
+      </div>
+    </div>
+
+    <div class="result-panel" id="singleResult">
+      <div class="result-main">
+        <div class="result-rainfall">
+          <div class="result-mm" id="resultMM">0.00</div>
+          <div class="result-unit">mm / day</div>
+          <div class="result-date-label" id="resultDateLabel">—</div>
+          <div class="intensity-badge" id="intensityBadge">—</div>
+        </div>
+        <div>
+          <div style="margin-bottom:12px;font-size:0.8rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px">Weather Context (Climatological)</div>
+          <div class="result-meta" id="resultMeta"></div>
+          <div style="margin-top:14px">
+            <canvas id="rainGauge" height="80"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+      <div class="card-header">
+        <div><div class="card-title">How It Works</div></div>
+      </div>
+      <div class="info-box" style="margin-bottom:0">
+        <b>Prediction Method:</b> The model was trained on 1995–2023 daily NASA POWER data. For future dates, it uses historical climatology (average seasonal patterns by Day-of-Year) as the feature input, then applies the Random Forest to predict rainfall. The model captures <b>monsoon seasonality</b> through sinusoidal DOY features and learned patterns from 3 decades of data.
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ DATE RANGE ═══ -->
+  <div id="page-range" class="page">
+    <div class="section-header">
+      <div class="section-title">📅 Date Range Prediction</div>
+      <div class="section-sub">Get day-by-day rainfall predictions for any future period</div>
+    </div>
+
+    <div class="predictor-hero">
+      <div class="date-picker-row">
+        <div class="inp-group">
+          <label class="inp-label">Start Date</label>
+          <input type="date" class="date-inp" id="rangeStart" min="2026-01-01" max="2030-12-31" value="2026-01-01">
+        </div>
+        <div class="inp-group">
+          <label class="inp-label">End Date</label>
+          <input type="date" class="date-inp" id="rangeEnd" min="2026-01-01" max="2030-12-31" value="2026-12-31">
+        </div>
+        <button class="btn btn-primary" onclick="predictRange()">📊 Generate Forecast</button>
+        <button class="btn btn-ghost" onclick="setQuickRange('monsoon')">🌧️ Monsoon 2026</button>
+        <button class="btn btn-ghost" onclick="setQuickRange('dry')">☀️ Dry Season 2026</button>
+      </div>
+    </div>
+
+    <div id="rangeResult" style="display:none">
+      <div class="range-stats" id="rangeStats"></div>
+      <div class="card">
+        <div class="card-header">
+          <div><div class="card-title">Daily Rainfall Forecast</div></div>
+          <div class="card-badge" id="rangeLabel">—</div>
+        </div>
+        <div class="chart-wrap" style="height:280px"><canvas id="rangeChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Daily Predictions Table</div></div>
+        <div style="max-height:350px;overflow-y:auto">
+          <table class="data-table" id="rangeTable">
+            <thead><tr><th>Date</th><th>Rainfall (mm/day)</th><th>Temp (°C)</th><th>Intensity</th><th>Bar</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 2026 FORECAST ═══ -->
+  <div id="page-forecast" class="page">
+    <div class="section-header">
+      <div class="section-title">🔮 Full Year 2026 Forecast</div>
+      <div class="section-sub">365-day daily rainfall prediction for Siem Reap — pre-computed from the trained model</div>
+    </div>
+
+    <div id="forecastContent">
+      <div class="loading"><div class="spinner"></div>Loading forecast...</div>
+    </div>
+  </div>
+
+  <!-- ═══ MODELS ═══ -->
+  <div id="page-models" class="page">
+    <div class="section-header">
+      <div class="section-title">🤖 Model Comparison</div>
+      <div class="section-sub">Three ML models trained on 10,592 rows of data (1995–2023) and evaluated on 2024–2025</div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div><div class="card-title">Performance Metrics</div></div><div class="card-badge">TEST SET 2024–2025</div></div>
+      <table class="model-table" id="modelTable">
+        <thead><tr><th>Model</th><th>R² Score</th><th>RMSE (mm/day)</th><th>MAE (mm/day)</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="g2">
+      <div class="card">
+        <div class="card-header"><div><div class="card-title">R² Score Comparison</div></div></div>
+        <div class="chart-wrap" style="height:220px"><canvas id="modelR2Chart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div><div class="card-title">RMSE Comparison</div></div></div>
+        <div class="chart-wrap" style="height:220px"><canvas id="modelRmseChart"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Model Details</div></div>
+      <div class="g3">
+        <div class="info-box"><b>🌲 Random Forest ⭐</b><br>200 trees, max_depth=12, bagging. Best generalisation. Selected as final model for predictions.</div>
+        <div class="info-box"><b>🚀 Gradient Boosting</b><br>200 estimators, learning rate 0.05, max_depth=5. Sequential error correction. Strong on tabular data.</div>
+        <div class="info-box"><b>🧠 Neural Network (MLP)</b><br>Layers: 128→64→32, ReLU, early stopping. Learns nonlinear patterns but slightly less stable than RF.</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ══════════════════════════════════════════════
+// CHART DEFAULTS
+// ══════════════════════════════════════════════
+Chart.defaults.color='#7ea4c4';
+Chart.defaults.font.family="'Outfit',sans-serif";
+const GRID={color:'rgba(22,32,53,0.7)',lineWidth:1};
+function baseOpts(xl='',yl=''){
+  return{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(4,8,15,0.95)',
+      borderColor:'rgba(14,165,233,0.2)',borderWidth:1,titleColor:'#0ea5e9',
+      bodyColor:'#e2edf8',padding:10,cornerRadius:8}},
+    scales:{x:{grid:GRID,ticks:{color:'#3d6080',font:{size:10}},title:{display:!!xl,text:xl,color:'#7ea4c4',font:{size:10}}},
+      y:{grid:GRID,ticks:{color:'#3d6080',font:{size:10}},title:{display:!!yl,text:yl,color:'#7ea4c4',font:{size:10}}}}};
+}
+
+let charts={};
+function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+
+// ══════════════════════════════════════════════
+// DATA FETCH & INIT
+// ══════════════════════════════════════════════
+let globalData=null;
+let forecastData=null;
+let rangeChart=null;
+
+async function init(){
+  try{
+    const r=await fetch('/api/overview');
+    globalData=await r.json();
+    renderHeaderStats();
+    renderKPIs();
+    renderMonthlyChart();
+    renderYearlyChart();
+    loadTestChart();
+  }catch(e){console.error(e);}
+}
+
+function renderHeaderStats(){
+  const d=globalData;
+  document.getElementById('hModel').textContent=d.best_model.split(' ')[0]+'…';
+  document.getElementById('hR2').textContent=d.r2.toFixed(4);
+  document.getElementById('hRMSE').textContent=d.rmse.toFixed(2);
+}
+
+function renderKPIs(){
+  const d=globalData;
+  const kpis=[
+    {label:'Best Model',val:d.best_model,desc:'Trained on 1995–2023 data',color:'var(--blue)'},
+    {label:'R² Score (Test)',val:d.r2.toFixed(4),desc:'2024–2025 unseen data',color:'var(--green)'},
+    {label:'RMSE',val:d.rmse.toFixed(2)+' mm',desc:'Per day error',color:'var(--orange)'},
+    {label:'MAE',val:d.mae.toFixed(2)+' mm',desc:'Mean absolute error',color:'var(--yellow)'},
+    {label:'Training Rows',val:'10,592',desc:'1995–2023 daily records',color:'var(--cyan)'},
+    {label:'Features',val:'16',desc:'incl. seasonal SIN/COS',color:'var(--purple)'},
+  ];
+  document.getElementById('kpiGrid').innerHTML=kpis.map(k=>`
+    <div class="kpi" style="--kpi-color:${k.color}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-val">${k.val}</div>
+      <div class="kpi-desc">${k.desc}</div>
+    </div>`).join('');
+}
+
+function renderMonthlyChart(){
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const vals=months.map((_,i)=>globalData.hist_monthly[String(i+1)]||0);
+  destroyChart('monthly');
+  charts['monthly']=new Chart(document.getElementById('monthlyChart'),{
+    type:'bar',
+    data:{labels:months,datasets:[{data:vals,
+      backgroundColor:months.map((_,i)=>i>=4&&i<=9?'rgba(14,165,233,0.7)':'rgba(14,165,233,0.25)'),
+      borderColor:months.map((_,i)=>i>=4&&i<=9?'#0ea5e9':'rgba(14,165,233,0.4)'),
+      borderWidth:1,borderRadius:5}]},
+    options:{...baseOpts('Month','Avg Rainfall (mm/day)'),
+      plugins:{...baseOpts().plugins,legend:{display:false},
+        tooltip:{...baseOpts().plugins.tooltip,callbacks:{label:c=>`${c.parsed.y.toFixed(2)} mm/day`}}}}
+  });
+}
+
+function renderYearlyChart(){
+  const years=Object.keys(globalData.hist_yearly).sort();
+  const vals=years.map(y=>globalData.hist_yearly[y]);
+  destroyChart('yearly');
+  // trend line
+  const n=years.length;
+  const mx=years.map(Number).reduce((a,b)=>a+b)/n;
+  const my=vals.reduce((a,b)=>a+b)/n;
+  const slope=years.reduce((a,y,i)=>a+(Number(y)-mx)*(vals[i]-my),0)/years.reduce((a,y)=>a+(Number(y)-mx)**2,0);
+  const trend=years.map(y=>Math.round(slope*(Number(y)-mx)+my));
+  charts['yearly']=new Chart(document.getElementById('yearlyChart'),{
+    type:'line',
+    data:{labels:years,datasets:[
+      {data:vals,borderColor:'#0ea5e9',backgroundColor:'rgba(14,165,233,0.06)',
+       borderWidth:2,pointRadius:2,fill:true,tension:0.3,label:'Annual mm'},
+      {data:trend,borderColor:'rgba(249,115,22,0.6)',borderDash:[5,3],
+       borderWidth:1.5,pointRadius:0,fill:false,tension:0,label:'Trend'}
+    ]},
+    options:{...baseOpts('Year','Total Rainfall (mm)'),
+      plugins:{...baseOpts().plugins,
+        legend:{display:true,labels:{color:'#7ea4c4',font:{size:11},boxWidth:14}}}}
+  });
+}
+
+async function loadTestChart(){
+  try{
+    const r=await fetch('/api/test_records');
+    const d=await r.json();
+    const recs=d.records.slice(0,100);
+    const labels=recs.map(r=>r.date.substring(5));
+    destroyChart('test');
+    charts['test']=new Chart(document.getElementById('testChart'),{
+      type:'line',
+      data:{labels,datasets:[
+        {data:recs.map(r=>r.actual),borderColor:'#0ea5e9',borderWidth:1.5,
+         pointRadius:0,fill:false,tension:0.3,label:'Actual'},
+        {data:recs.map(r=>r.predicted),borderColor:'#f97316',borderDash:[4,3],
+         borderWidth:1.5,pointRadius:0,fill:false,tension:0.3,label:'Predicted'}
+      ]},
+      options:{...baseOpts('','mm/day'),
+        plugins:{...baseOpts().plugins,
+          legend:{display:true,labels:{color:'#7ea4c4',font:{size:11},boxWidth:14}}}}
+    });
+  }catch(e){}
+}
+
+// ══════════════════════════════════════════════
+// PREDICT SINGLE DATE
+// ══════════════════════════════════════════════
+async function predictSingle(){
+  const date=document.getElementById('singleDate').value;
+  if(!date)return;
+  try{
+    const r=await fetch(`/api/predict?date=${date}`);
+    const d=await r.json();
+    if(d.error){alert(d.error);return;}
+    document.getElementById('resultMM').textContent=d.predicted_rainfall_mm.toFixed(2);
+    document.getElementById('resultDateLabel').textContent=formatDate(date);
+    
+    const {color,bg,label}=intensityStyle(d.level);
+    const badge=document.getElementById('intensityBadge');
+    badge.textContent=d.intensity;
+    badge.style.cssText=`background:${bg};color:${color};border:1px solid ${color}44;`;
+    
+    const wc=d.weather_context;
+    document.getElementById('resultMeta').innerHTML=[
+      {l:'Temperature',v:wc.temperature_C+'°C',c:'var(--blue)'},
+      {l:'Max Temp',v:wc.max_temp_C+'°C',c:'var(--orange)'},
+      {l:'Min Temp',v:wc.min_temp_C+'°C',c:'var(--cyan)'},
+      {l:'Humidity',v:wc.humidity_pct+'%',c:'var(--green)'},
+      {l:'Dew Point',v:wc.dew_point_C+'°C',c:'var(--purple)'},
+      {l:'Wind Speed',v:wc.wind_speed_ms+' m/s',c:'var(--yellow)'},
+    ].map(m=>`<div class="meta-card">
+      <div class="meta-val" style="color:${m.c}">${m.v}</div>
+      <div class="meta-label">${m.l}</div>
+    </div>`).join('');
+    
+    // Mini gauge
+    drawGauge(d.predicted_rainfall_mm, color);
+    document.getElementById('singleResult').classList.add('show');
+  }catch(e){alert('Error connecting to server');}
+}
+
+function predictToday(){
+  const d=new Date();
+  d.setFullYear(d.getFullYear()+1);
+  document.getElementById('singleDate').value=d.toISOString().split('T')[0];
+  predictSingle();
+}
+
+function drawGauge(val,color){
+  const canvas=document.getElementById('rainGauge');
+  const ctx=canvas.getContext('2d');
+  canvas.width=canvas.offsetWidth||400;
+  canvas.height=80;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const max=18;const pct=Math.min(val/max,1);
+  // track
+  ctx.fillStyle='rgba(22,32,53,0.8)';
+  ctx.beginPath();ctx.roundRect(0,30,canvas.width,20,5);ctx.fill();
+  // fill
+  if(pct>0){
+    ctx.fillStyle=color;
+    ctx.beginPath();ctx.roundRect(0,30,canvas.width*pct,20,5);ctx.fill();
+  }
+  ctx.fillStyle='#7ea4c4';ctx.font='11px JetBrains Mono';
+  ctx.fillText(`${val.toFixed(2)} mm`,8,24);
+  ctx.fillText(`Max 18 mm`,canvas.width-80,24);
+}
+
+// ══════════════════════════════════════════════
+// DATE RANGE
+// ══════════════════════════════════════════════
+function setQuickRange(type){
+  if(type==='monsoon'){document.getElementById('rangeStart').value='2026-05-01';document.getElementById('rangeEnd').value='2026-10-31';}
+  else{document.getElementById('rangeStart').value='2026-11-01';document.getElementById('rangeEnd').value='2027-04-30';}
+}
+
+async function predictRange(){
+  const start=document.getElementById('rangeStart').value;
+  const end=document.getElementById('rangeEnd').value;
+  if(!start||!end)return;
+  document.getElementById('rangeResult').style.display='none';
+  try{
+    const r=await fetch(`/api/range?start=${start}&end=${end}`);
+    const d=await r.json();
+    if(d.error){alert(d.error);return;}
+    
+    // Stats
+    document.getElementById('rangeStats').innerHTML=[
+      {l:'Total Days',v:d.days,c:'var(--blue)'},
+      {l:'Total Rainfall',v:d.total_rainfall_mm+' mm',c:'var(--cyan)'},
+      {l:'Rainy Days',v:d.rainy_days,c:'var(--green)'},
+      {l:'Avg Daily',v:(d.total_rainfall_mm/d.days).toFixed(2)+' mm',c:'var(--yellow)'},
+    ].map(s=>`<div class="kpi" style="--kpi-color:${s.c}">
+      <div class="kpi-label">${s.l}</div>
+      <div class="kpi-val" style="font-size:1.3rem">${s.v}</div>
+    </div>`).join('');
+    
+    document.getElementById('rangeLabel').textContent=`${start} → ${end}`;
+    
+    // Chart
+    if(rangeChart){rangeChart.destroy();}
+    rangeChart=new Chart(document.getElementById('rangeChart'),{
+      type:'bar',
+      data:{
+        labels:d.daily.map(r=>r.date.substring(5)),
+        datasets:[{data:d.daily.map(r=>r.predicted_rainfall_mm),
+          backgroundColor:d.daily.map(r=>rainColor(r.predicted_rainfall_mm,0.7)),
+          borderColor:d.daily.map(r=>rainColor(r.predicted_rainfall_mm,1)),
+          borderWidth:1,borderRadius:2}]},
+      options:{...baseOpts('Date','mm/day'),
+        plugins:{...baseOpts().plugins,tooltip:{...baseOpts().plugins.tooltip,
+          callbacks:{label:c=>`${c.parsed.y.toFixed(2)} mm/day`}}}}
+    });
+    
+    // Table
+    const tbody=document.querySelector('#rangeTable tbody');
+    const max=Math.max(...d.daily.map(r=>r.predicted_rainfall_mm),1);
+    tbody.innerHTML=d.daily.map(r=>{
+      const{label,color}=intensityStyle(getLevel(r.predicted_rainfall_mm));
+      const pct=(r.predicted_rainfall_mm/max*100).toFixed(1);
+      return`<tr>
+        <td>${r.date}</td>
+        <td>${r.predicted_rainfall_mm.toFixed(3)}</td>
+        <td>${r.temp_C}</td>
+        <td><span style="color:${color};font-size:0.75rem">${intensityLabel(r.predicted_rainfall_mm)}</span></td>
+        <td style="min-width:80px"><div class="rain-bar"><div class="rain-fill" style="width:${pct}%;background:${color}"></div></div></td>
+      </tr>`;
+    }).join('');
+    
+    document.getElementById('rangeResult').style.display='block';
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ══════════════════════════════════════════════
+// 2026 FORECAST PAGE
+// ══════════════════════════════════════════════
+async function loadForecast(){
+  if(forecastData)return;
+  try{
+    const r=await fetch('/api/future');
+    const d=await r.json();
+    forecastData=d.predictions;
+    renderForecast();
+  }catch(e){document.getElementById('forecastContent').innerHTML='<div class="info-box">Error loading forecast data.</div>';}
+}
+
+function renderForecast(){
+  const preds=forecastData;
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  
+  // Monthly totals
+  const monthly=new Array(12).fill(0);
+  const monthlyCounts=new Array(12).fill(0);
+  preds.forEach(p=>{monthly[p.month-1]+=p.predicted_rainfall;monthlyCounts[p.month-1]++;});
+  const monthlyAvg=monthly.map((s,i)=>monthlyCounts[i]?+(s/monthlyCounts[i]).toFixed(2):0);
+  const monthlyTotal=monthly.map(s=>+s.toFixed(1));
+  const totalYear=monthlyTotal.reduce((a,b)=>a+b).toFixed(1);
+  const rainyDays=preds.filter(p=>p.predicted_rainfall>0.5).length;
+  const maxDay=preds.reduce((a,b)=>b.predicted_rainfall>a.predicted_rainfall?b:a);
+
+  document.getElementById('forecastContent').innerHTML=`
+    <div class="kpi-grid">
+      <div class="kpi" style="--kpi-color:var(--blue)"><div class="kpi-label">Predicted Annual Rainfall</div><div class="kpi-val">${totalYear} mm</div><div class="kpi-desc">Full 2026</div></div>
+      <div class="kpi" style="--kpi-color:var(--green)"><div class="kpi-label">Rainy Days</div><div class="kpi-val">${rainyDays}</div><div class="kpi-desc">&gt;0.5 mm threshold</div></div>
+      <div class="kpi" style="--kpi-color:var(--orange)"><div class="kpi-label">Peak Month</div><div class="kpi-val">${months[monthlyAvg.indexOf(Math.max(...monthlyAvg))]}</div><div class="kpi-desc">Highest avg rainfall</div></div>
+      <div class="kpi" style="--kpi-color:var(--yellow)"><div class="kpi-label">Peak Day Predicted</div><div class="kpi-val">${maxDay.predicted_rainfall.toFixed(2)} mm</div><div class="kpi-desc">${maxDay.date}</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div><div class="card-title">Daily Rainfall Forecast — Full Year 2026</div><div class="card-sub">All 365 days predicted by the Random Forest model</div></div><div class="card-badge">2026 FULL YEAR</div></div>
+      <div class="chart-wrap" style="height:280px"><canvas id="forecastDailyChart"></canvas></div>
+    </div>
+    <div class="g2">
+      <div class="card">
+        <div class="card-header"><div><div class="card-title">Monthly Totals 2026</div></div></div>
+        <div class="chart-wrap" style="height:220px"><canvas id="forecastMonthlyChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div><div class="card-title">2026 Forecast Table</div></div></div>
+        <div style="max-height:280px;overflow-y:auto">
+          <table class="data-table">
+            <thead><tr><th>Month</th><th>Total (mm)</th><th>Avg (mm/day)</th><th>Rainy Days</th></tr></thead>
+            <tbody>${months.map((m,i)=>{
+              const rd=preds.filter(p=>p.month===i+1&&p.predicted_rainfall>0.5).length;
+              return`<tr><td>${m}</td><td>${monthlyTotal[i]}</td><td>${monthlyAvg[i]}</td><td>${rd}</td></tr>`;
+            }).join('')}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>`;
+  
+  // Daily chart
+  destroyChart('fDaily');
+  charts['fDaily']=new Chart(document.getElementById('forecastDailyChart'),{
+    type:'bar',
+    data:{labels:preds.map(p=>p.date.substring(5)),
+      datasets:[{data:preds.map(p=>p.predicted_rainfall),
+        backgroundColor:preds.map(p=>rainColor(p.predicted_rainfall,0.6)),
+        borderColor:preds.map(p=>rainColor(p.predicted_rainfall,0.9)),
+        borderWidth:1,borderRadius:1}]},
+    options:{...baseOpts('Day of Year','mm/day'),
+      plugins:{...baseOpts().plugins,tooltip:{...baseOpts().plugins.tooltip,
+        callbacks:{label:c=>`${c.parsed.y.toFixed(2)} mm`,
+          title:t=>`Date: ${preds[t[0].dataIndex]?.date||''}`}}}}
+  });
+  
+  // Monthly chart
+  destroyChart('fMonthly');
+  charts['fMonthly']=new Chart(document.getElementById('forecastMonthlyChart'),{
+    type:'bar',
+    data:{labels:months,datasets:[{data:monthlyTotal,
+      backgroundColor:monthlyTotal.map(v=>rainColor(v/30,0.7)),
+      borderColor:monthlyTotal.map(v=>rainColor(v/30,1)),
+      borderWidth:1,borderRadius:5}]},
+    options:{...baseOpts('Month','Total Rainfall (mm)'),
+      plugins:{...baseOpts().plugins,tooltip:{...baseOpts().plugins.tooltip,
+        callbacks:{label:c=>`${c.parsed.y} mm total`}}}}
+  });
+}
+
+// ══════════════════════════════════════════════
+// MODELS PAGE
+// ══════════════════════════════════════════════
+function renderModels(){
+  if(!globalData)return;
+  const mr=globalData.model_results;
+  const names=Object.keys(mr);
+  const bestName=names.reduce((a,b)=>mr[b].r2>mr[a].r2?b:a,names[0]);
+  
+  const tbody=document.querySelector('#modelTable tbody');
+  tbody.innerHTML=names.map(n=>`<tr class="${n===bestName?'best-row':''}">
+    <td class="model-name">${n}${n===bestName?'<span class="best-tag">⭐ BEST</span>':''}</td>
+    <td>${mr[n].r2.toFixed(4)}</td>
+    <td>${mr[n].rmse.toFixed(4)}</td>
+    <td>${mr[n].mae.toFixed(4)}</td>
+  </tr>`).join('');
+  
+  destroyChart('mR2');
+  charts['mR2']=new Chart(document.getElementById('modelR2Chart'),{
+    type:'bar',
+    data:{labels:names,datasets:[{data:names.map(n=>mr[n].r2),
+      backgroundColor:names.map(n=>n===bestName?'rgba(16,185,129,0.6)':'rgba(14,165,233,0.4)'),
+      borderColor:names.map(n=>n===bestName?'#10b981':'#0ea5e9'),
+      borderWidth:1,borderRadius:6}]},
+    options:{...baseOpts('Model','R² Score')}
+  });
+  
+  destroyChart('mRmse');
+  charts['mRmse']=new Chart(document.getElementById('modelRmseChart'),{
+    type:'bar',
+    data:{labels:names,datasets:[{data:names.map(n=>mr[n].rmse),
+      backgroundColor:names.map(n=>n===bestName?'rgba(16,185,129,0.6)':'rgba(249,115,22,0.4)'),
+      borderColor:names.map(n=>n===bestName?'#10b981':'#f97316'),
+      borderWidth:1,borderRadius:6}]},
+    options:{...baseOpts('Model','RMSE (mm/day)')}
+  });
+}
+
+// ══════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════
+function showPage(name,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  if(btn)btn.classList.add('active');
+  if(name==='forecast')loadForecast();
+  if(name==='models')renderModels();
+}
+
+// ══════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════
+function intensityStyle(level){
+  const s=[
+    {color:'#7ea4c4',bg:'rgba(126,164,196,0.1)',label:'No Rain'},
+    {color:'#0ea5e9',bg:'rgba(14,165,233,0.1)',label:'Light'},
+    {color:'#06b6d4',bg:'rgba(6,182,212,0.1)',label:'Moderate'},
+    {color:'#f97316',bg:'rgba(249,115,22,0.1)',label:'Heavy'},
+    {color:'#ef4444',bg:'rgba(239,68,68,0.1)',label:'Very Heavy'},
+  ];
+  return s[Math.min(level,4)];
+}
+function getLevel(mm){
+  if(mm<0.5)return 0;if(mm<2.5)return 1;if(mm<7.5)return 2;if(mm<15)return 3;return 4;
+}
+function intensityLabel(mm){
+  return['No Rain','Light Rain','Moderate Rain','Heavy Rain','Very Heavy'][getLevel(mm)];
+}
+function rainColor(mm,alpha=1){
+  if(mm<0.5)return`rgba(62,80,120,${alpha})`;
+  if(mm<2.5)return`rgba(14,165,233,${alpha})`;
+  if(mm<7.5)return`rgba(6,182,212,${alpha})`;
+  if(mm<12)return`rgba(249,115,22,${alpha})`;
+  return`rgba(239,68,68,${alpha})`;
+}
+function formatDate(ds){
+  const d=new Date(ds+'T00:00:00');
+  return d.toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+
+// ══════════════════════════════════════════════
+// BOOT
+// ══════════════════════════════════════════════
+init();
+</script>
+
+<script>
+// ══════════════════════════════════════════
+// HEAVY RAIN + THUNDER + LIGHTNING EFFECT
+// ══════════════════════════════════════════
+(function(){
+  const rainCanvas = document.getElementById('rain-canvas');
+  const rctx       = rainCanvas.getContext('2d');
+  const lCanvas    = document.getElementById('lightning-canvas');
+  const lctx       = lCanvas.getContext('2d');
+  const flash      = document.getElementById('thunderFlash');
+  let drops = [], splashes = [];
+  let W, H;
+  let isMuted      = false;
+  let audioCtx     = null;
+  let rainGain     = null;
+  let soundStarted = false;
+
+  // ── RESIZE ──
+  function resize(){
+    W = rainCanvas.width  = lCanvas.width  = window.innerWidth;
+    H = rainCanvas.height = lCanvas.height = window.innerHeight;
+  }
+
+  // ── RAIN DROPS ──
+  function makeDrop(){
+    return {
+      x      : Math.random() * W * 1.3 - W * 0.15,
+      y      : Math.random() * H - H,
+      len    : Math.random() * 25 + 15,
+      speed  : Math.random() * 18 + 14,
+      width  : Math.random() * 1.5 + 0.4,
+      opacity: Math.random() * 0.55 + 0.35,
+      wind   : 2.5
+    };
+  }
+
+  function makeSplash(x, y){
+    return { x, y, r:0, maxR: Math.random()*6+3, opacity:0.6, grow: Math.random()*1.5+1 };
+  }
+
+  function init(){
+    resize();
+    drops = [];
+    const count = Math.floor(W / 3.5);
+    for(let i=0; i<count; i++){
+      const d = makeDrop();
+      d.y = Math.random() * H;
+      drops.push(d);
+    }
+  }
+
+  function drawRain(){
+    rctx.clearRect(0, 0, W, H);
+    drops.forEach(d => {
+      const grad = rctx.createLinearGradient(d.x, d.y, d.x - d.wind, d.y + d.len);
+      grad.addColorStop(0, 'rgba(14,165,233,0)');
+      grad.addColorStop(1, 'rgba(100,200,255,' + d.opacity + ')');
+      rctx.beginPath();
+      rctx.moveTo(d.x, d.y);
+      rctx.lineTo(d.x - d.wind, d.y + d.len);
+      rctx.strokeStyle = grad;
+      rctx.lineWidth   = d.width;
+      rctx.lineCap     = 'round';
+      rctx.stroke();
+      d.y += d.speed;
+      d.x -= d.wind * 0.3;
+      if(d.y > H + d.len){
+        splashes.push(makeSplash(d.x, H - 2));
+        const nd = makeDrop();
+        d.x=nd.x; d.y=nd.y; d.speed=nd.speed; d.len=nd.len; d.opacity=nd.opacity; d.width=nd.width;
+      }
+    });
+    splashes = splashes.filter(s => s.opacity > 0.05);
+    splashes.forEach(s => {
+      rctx.beginPath();
+      rctx.arc(s.x, s.y, s.r, Math.PI, 2*Math.PI);
+      rctx.strokeStyle = 'rgba(100,200,255,' + s.opacity + ')';
+      rctx.lineWidth = 0.8;
+      rctx.stroke();
+      s.r += s.grow;
+      s.opacity -= 0.06;
+    });
+    requestAnimationFrame(drawRain);
+  }
+
+  // ── LIGHTNING BOLT DRAWING ──
+  function drawLightningBolt(x1, y1, x2, y2, branches, ctx){
+    if(branches <= 0) return;
+    const dx  = x2 - x1;
+    const dy  = y2 - y1;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    if(len < 5) return;
+
+    const segments = Math.max(4, Math.floor(len / 40));
+    let points = [{x: x1, y: y1}];
+
+    for(let i=1; i<segments; i++){
+      const t      = i / segments;
+      const px     = x1 + dx * t + (Math.random()-0.5) * 80;
+      const py     = y1 + dy * t + (Math.random()-0.5) * 30;
+      points.push({x: px, y: py});
+    }
+    points.push({x: x2, y: y2});
+
+    // Outer glow
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for(let i=1; i<points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+    ctx.strokeStyle = 'rgba(180,220,255,0.25)';
+    ctx.lineWidth   = 10;
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+    ctx.filter      = 'blur(6px)';
+    ctx.stroke();
+
+    // Middle glow
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for(let i=1; i<points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+    ctx.strokeStyle = 'rgba(140,200,255,0.6)';
+    ctx.lineWidth   = 4;
+    ctx.filter      = 'blur(2px)';
+    ctx.stroke();
+
+    // Core bright bolt
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for(let i=1; i<points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+    ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+    ctx.lineWidth   = 1.5;
+    ctx.filter      = 'none';
+    ctx.stroke();
+
+    // Branch bolts
+    if(branches > 1){
+      const branchCount = Math.floor(Math.random()*2)+1;
+      for(let b=0; b<branchCount; b++){
+        const idx   = Math.floor(Math.random()*(points.length-2))+1;
+        const bx    = points[idx].x;
+        const by    = points[idx].y;
+        const angle = Math.atan2(dy, dx) + (Math.random()-0.5) * 1.2;
+        const blen  = len * (Math.random()*0.3+0.2);
+        const ex    = bx + Math.cos(angle)*blen;
+        const ey    = by + Math.sin(angle)*blen;
+        ctx.globalAlpha = 0.6;
+        drawLightningBolt(bx, by, ex, ey, branches-1, ctx);
+        ctx.globalAlpha = 1.0;
+      }
+    }
+  }
+
+  function doLightningStrike(){
+    lctx.clearRect(0, 0, W, H);
+    const startX  = W * 0.1 + Math.random() * W * 0.8;
+    const startY  = 0;
+    const endX    = startX + (Math.random()-0.5) * 200;
+    const endY    = H * 0.4 + Math.random() * H * 0.45;
+    const branches = 3;
+
+    // Draw bolt
+    drawLightningBolt(startX, startY, endX, endY, branches, lctx);
+
+    // Flash screen
+    let fc = 0;
+    const flashFrames = [0.12, 0.06, 0.10, 0.03, 0.08, 0];
+    function nextFlash(){
+      if(fc >= flashFrames.length){ flash.style.background='rgba(180,220,255,0)'; return; }
+      flash.style.background = 'rgba(180,220,255,' + flashFrames[fc] + ')';
+      fc++;
+      setTimeout(nextFlash, fc%2===0 ? 50 : 80);
+    }
+    nextFlash();
+
+    // Fade out bolt
+    let alpha = 1.0;
+    function fadeBolt(){
+      alpha -= 0.12;
+      if(alpha <= 0){ lctx.clearRect(0,0,W,H); return; }
+      lctx.globalAlpha = alpha;
+      lctx.clearRect(0,0,W,H);
+      drawLightningBolt(startX, startY, endX, endY, branches, lctx);
+      lctx.globalAlpha = 1.0;
+      setTimeout(fadeBolt, 30);
+    }
+    setTimeout(fadeBolt, 80);
+
+    // Thunder sound
+    if(!isMuted && audioCtx){
+      try{
+        const buf  = audioCtx.createBuffer(1, audioCtx.sampleRate*2.5, audioCtx.sampleRate);
+        const data = buf.getChannelData(0);
+        for(let j=0; j<data.length; j++){
+          const decay = Math.exp(-j/(audioCtx.sampleRate*0.8));
+          data[j] = (Math.random()*2-1)*decay*0.7;
+        }
+        const src    = audioCtx.createBufferSource();
+        const filter = audioCtx.createBiquadFilter();
+        const gain   = audioCtx.createGain();
+        filter.type = 'lowpass'; filter.frequency.value = 200;
+        gain.gain.setValueAtTime(0.001, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(1.0, audioCtx.currentTime+0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime+2.2);
+        src.buffer = buf;
+        src.connect(filter); filter.connect(gain); gain.connect(audioCtx.destination);
+        src.start();
+      }catch(e){}
+    }
+
+    // Schedule next strike
+    setTimeout(doLightningStrike, Math.random()*9000+5000);
+  }
+
+  // ── RAIN SOUND ──
+  function startSounds(){
+    if(soundStarted) return;
+    soundStarted = true;
+    try{
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const buf  = audioCtx.createBuffer(1, audioCtx.sampleRate*2, audioCtx.sampleRate);
+      const data = buf.getChannelData(0);
+      for(let j=0; j<data.length; j++) data[j] = Math.random()*2-1;
+      const src    = audioCtx.createBufferSource();
+      const filter = audioCtx.createBiquadFilter();
+      rainGain     = audioCtx.createGain();
+      filter.type = 'bandpass'; filter.frequency.value = 1200; filter.Q.value = 0.5;
+      rainGain.gain.value = 0.04;
+      src.buffer = buf; src.loop = true;
+      src.connect(filter); filter.connect(rainGain); rainGain.connect(audioCtx.destination);
+      src.start();
+    }catch(e){}
+  }
+
+  // ── MUTE TOGGLE ──
+  window.toggleMute = function(){
+    isMuted = !isMuted;
+    const btn = document.getElementById('muteBtn');
+    if(isMuted){
+      btn.textContent = '🔇 Sound OFF';
+      btn.style.background = 'rgba(239,68,68,0.15)';
+      btn.style.borderColor = 'rgba(239,68,68,0.35)';
+      if(rainGain) rainGain.gain.value = 0;
+    } else {
+      btn.textContent = '🔊 Sound ON';
+      btn.style.background = 'rgba(14,165,233,0.15)';
+      btn.style.borderColor = 'rgba(14,165,233,0.35)';
+      if(rainGain) rainGain.gain.value = 0.04;
+      if(!soundStarted) startSounds();
+    }
+  };
+
+  window.addEventListener('resize', init);
+  init();
+  drawRain();
+
+  // Start sounds on first click
+  document.addEventListener('click', function(e){
+    if(e.target.id !== 'muteBtn' && !soundStarted && !isMuted) startSounds();
+  });
+
+  // Start lightning after 2 seconds
+  setTimeout(doLightningStrike, 2000);
+
+})();
+</script>
+
+</body>
+</html>
